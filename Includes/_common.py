@@ -14,14 +14,14 @@ def __validate_libraries():
 def __install_libraries():
     global pip_command
     
-    specified_version = f"v3.0.23"
+    specified_version = f"v3.0.57"
     key = "dbacademy.library.version"
     version = spark.conf.get(key, specified_version)
 
     if specified_version != version:
         print("** Dependency Version Overridden *******************************************************************")
         print(f"* This course was built for {specified_version} of the DBAcademy Library, but it is being overridden via the Spark")
-        print(f"* configuration variable \"{key}\". The use of version v3.0.23 is not advised as we")
+        print(f"* configuration variable \"{key}\". The use of version v3.0.57 is not advised as we")
         print(f"* cannot guarantee compatibility with this version of the course.")
         print("****************************************************************************************************")
 
@@ -95,9 +95,9 @@ def clone_table(self, username, schema_name, table_name, location, verbose=False
     existing_tables = [r["tableName"] for r in spark.sql(f"SHOW TABLES IN {schema_name}").collect()]
     
     if table_name in existing_tables: 
-        if verbose: print(f"| skipping \"{table_name}\"...{clock_stopped(start)}")
-        return
-    elif verbose: print(f"| cloning \"{table_name}\"", end="...")
+        return f"| Skipping \"{table_name}\"...{dbgems.clock_stopped(start)}"
+    elif verbose: 
+        print(f"| Cloning \"{table_name}\"", end="...")
     
     physical_location = f"dbfs:/mnt/dbacademy-users/{username}/{self.course_config.course_name}/database.db/{table_name}"
     dbutils.fs.rm(physical_location, True)
@@ -108,7 +108,7 @@ def clone_table(self, username, schema_name, table_name, location, verbose=False
                       
     if verbose: print(dbgems.clock_stopped(start))
 
-    return f"| created table \"{table_name}\"."
+    return f"| Created table \"{table_name}\"."
 
 # COMMAND ----------
 
