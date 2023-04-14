@@ -95,7 +95,7 @@ DA.install_datasets(reinstall_datasets=False)
 # COMMAND ----------
 
 from dbacademy.dbhelper.warehouses_helper_class import WarehousesHelper
-DA.workspace.warehouses.create_shared_sql_warehouse(name=WarehousesHelper.WAREHOUSES_DEFAULT_NAME)
+new_warehouse_id = DA.workspace.warehouses.create_shared_sql_warehouse(name=WarehousesHelper.WAREHOUSES_DEFAULT_NAME)
 
 # COMMAND ----------
 
@@ -116,20 +116,29 @@ DA.create_user_databases(drop_existing=False)
 # MAGIC 
 # MAGIC Grant each user access to their personal databases.
 # MAGIC 
-# MAGIC This requires creating a job using an HA cluster to update user permissions.
-# MAGIC 
-# MAGIC For reference, this job runs the notebook [Configure-Permissions]($./Configure-Permissions)
-# MAGIC 
-# MAGIC To complete this step, simply run the following command.
+# MAGIC To complete this step, simply run the following two command.
 
 # COMMAND ----------
 
-from dbacademy.dbhelper.databases_helper_class import DatabasesHelper
+@DBAcademyHelper.monkey_patch
+def update_user_grants(self, username: str):
+    schema_name = self.to_schema_name(username=username, course_code=self.course_config.course_code, lesson_name=None)
+    
+    if spark.sql("SHOW DATABASES").filter(f"databaseName = '{schema_name}'").count() == 1:
+        DA.client.sql.statements.execute(statement=f"GRANT ALL PRIVILEGES ON DATABASE `{schema_name}` TO `{username}`", warehouse_id=new_warehouse_id, catalog="hive_metastore", schema=f"{schema_name}")
+        DA.client.sql.statements.execute(statement=f"GRANT ALL PRIVILEGES ON ANY FILE TO `{username}`", warehouse_id=new_warehouse_id, catalog="hive_metastore", schema=f"{schema_name}")
+        DA.client.sql.statements.execute(statement=f"ALTER DATABASE {schema_name} OWNER TO `{username}`", warehouse_id=new_warehouse_id, catalog="hive_metastore", schema=f"{schema_name}")
 
-# Ensures that all users can create databases on the current catalog 
-# for cases wherein the user/student is not an admin.
-job_id = DatabasesHelper.configure_permissions(DA.client, "Configure-Permissions", "10.4.x-scala2.12")
-DA.client.jobs().delete_by_id(job_id)
+
+# COMMAND ----------
+
+from dbacademy.dbhelper.workspace_helper_class import WorkspaceHelper
+
+configure_for = WorkspaceHelper.CONFIGURE_FOR_CURRENT_USER_ONLY if DBAcademyHelper.is_smoke_test() else WorkspaceHelper.CONFIGURE_FOR_ALL_USERS
+print(f"Configuring for \"{configure_for}\"")
+
+usernames = DA.workspace.get_usernames(configure_for)
+WorkspaceHelper.do_for_all_users(usernames, DA.update_user_grants)
 
 # COMMAND ----------
 
